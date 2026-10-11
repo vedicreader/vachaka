@@ -7,7 +7,7 @@ Docs: https://vedicreader.github.io/vachaka/recite.html.md"""
 # %% auto #0
 __all__ = ['word_text', 'pieces', 'piece_text', 'line_times', 'recite_section', 'shift', 'recite', 'recite_cli']
 
-# %% ../nbs/02_recite.ipynb #b21570a7
+# %% ../nbs/02_recite.ipynb #ea2b28e5
 import re, json, numpy as np
 from pathlib import Path
 from fastcore.utils import *
@@ -15,7 +15,7 @@ from fastcore.script import call_parse
 from .core import clean, n_syll, concat, Chanter
 from .check import best_of
 
-# %% ../nbs/02_recite.ipynb #f458beaa
+# %% ../nbs/02_recite.ipynb #8d5f6ae0
 _DANDA = re.compile('[।॥|]')
 def word_text(w): return clean(w).strip(' ।॥')
 
@@ -38,10 +38,10 @@ def pieces(lines, prose=False, max_syll=24, max_verse=44):
     if cur: close()
     return out
 
-# %% ../nbs/02_recite.ipynb #11c8a48c
+# %% ../nbs/02_recite.ipynb #6f3d2e45
 def piece_text(p): return ' '.join(o for o in (word_text(w) for _,w in p) if o)
 
-# %% ../nbs/02_recite.ipynb #7299a903
+# %% ../nbs/02_recite.ipynb #c1571bfd
 def line_times(n, ps, words):
     "Per line, `dict(s, e, w)` from the pieces' word timings; None for a line with no words."
     out = [None]*n
@@ -54,7 +54,7 @@ def line_times(n, ps, words):
         if d and d['s'] is None: d['s'] = d['e'] = d['w'][0][1]
     return out
 
-# %% ../nbs/02_recite.ipynb #835adecb
+# %% ../nbs/02_recite.ipynb #e7cb05df
 def recite_section(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
     "One section's lines to a `Recitation` plus per-line timings, its kind, reference and error rate."
     text = ' '.join(word_text(w) for l in lines for w in l.split())
@@ -67,7 +67,7 @@ def recite_section(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
     ws = ear.words(r, [[w for _,w in p] for p in ps])
     return r, dict(kind=kind, ref=ref, cer=round(r.cer, 3), lines=line_times(len(lines), ps, ws))
 
-# %% ../nbs/02_recite.ipynb #90ef44f1
+# %% ../nbs/02_recite.ipynb #652ec9c8
 def shift(info, off):
     "Move a section's timings `off` ms later."
     for d in info['lines']:
@@ -76,7 +76,7 @@ def shift(info, off):
         for w in d['w']: w[1] += off; w[2] += off
     return info
 
-# %% ../nbs/02_recite.ipynb #2e0edf18
+# %% ../nbs/02_recite.ipynb #90128168
 def recite(ch, ear, sections, gap=1.2, **kw):
     "Sections (each `dict(lines=…, kind=…, ref=…)`) to one `Recitation` and per-section timings."
     recs, infos, pos = [], [], 0
@@ -85,7 +85,7 @@ def recite(ch, ear, sections, gap=1.2, **kw):
         infos.append(shift(info, pos)); recs.append(r); pos += r.ms + round(gap*1000)
     return concat(recs, gap), infos
 
-# %% ../nbs/02_recite.ipynb #97db49f0
+# %% ../nbs/02_recite.ipynb #e8803ff0
 @call_parse
 def recite_cli(jobs:str, results:str, voice:str='steer', tries:int=3, max_cer:float=0.08):
     "Render a jsonl of jobs, appending timings to a jsonl of results."

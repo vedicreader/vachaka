@@ -1,5 +1,7 @@
 project:
   type: website
+  resources:
+    - examples/*.mp3
 
 format:
   html:
