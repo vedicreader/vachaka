@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.1.2
+
+- Words no longer end abruptly: each piece keeps 180 ms past its voice (Vāgdhenu's gate kept 60 ms) faded over 120 ms, and a part ends on half a second of silence (`Chanter(tail=, fade=, pad=)`).
+- Sound treatments for someone who is not a sound engineer, all loudness-matched to -16 LUFS and none moving a syllable in time: `warm` (a little warmth, a soft de-esser, a small room's echo), `phone` (compression and a lift around 3 kHz for small speakers) and `plain`. `Recitation.save(fx=)`, `polish(src, dst, fx)`, and `vachaka-recite --fx`, which defaults to `warm`.
+
 ## 0.1.1
 
 - A section is recited in parts, each in one voice, instead of all in one. The caller can pass the parts, `dict(lines=[…], meter=…)`, with metres from a better detector (VedicReader passes ganapati's): a metre in Vāgdhenu's bank is chanted against its reference, another vṛtta against vasantatilakā, and the āryā family or no metre is read. A commentary section that opens with verses now chants them and reads its prose.
