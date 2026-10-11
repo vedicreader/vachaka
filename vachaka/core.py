@@ -8,14 +8,14 @@ Docs: https://vedicreader.github.io/vachaka/core.html.md"""
 __all__ = ['SRCS', 'HF', 'VOICES', 'VOC', 'SR', 'cache', 'LN', 'FX', 'fetch_src', 'setup_paths', 'best_device', 'clean', 'n_syll',
            'chunk_prose', 'polish', 'Recitation', 'concat', 'Chanter']
 
-# %% ../nbs/00_core.ipynb #455d52ec
+# %% ../nbs/00_core.ipynb #9a379841
 import os, re, sys, io, tarfile, types, subprocess, unicodedata, urllib.request, numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
 from fastcore.utils import *
 os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
 
-# %% ../nbs/00_core.ipynb #8c52ae41
+# %% ../nbs/00_core.ipynb #0719d15a
 SRCS = dict(vagdhenu=('prathoshap/vagdhenu', 'c18927a8a77775753e32248177a5a6bea1019a12', 'src'),
             bigvgan=('NVIDIA/BigVGAN', '7d2b454564a6c7d014227f635b7423881f14bdac', ''),
             indicf5=('ai4bharat/IndicF5', '13f7c4d627cc10111aea8fe9c0039462cacacdc7', ''))
@@ -24,7 +24,7 @@ VOICES = dict(steer='voice_steer_ema_2026-06-17.pt', armA='voice_armA_ema_2026-0
 VOC, SR = 'voc_bigvgan_EMA_2026-06-11.pth', 24000
 cache = Path(os.environ.get('VACHAKA_CACHE', '~/.cache/vachaka')).expanduser()
 
-# %% ../nbs/00_core.ipynb #3efcef71
+# %% ../nbs/00_core.ipynb #ff40bf76
 def fetch_src(name):
     "Path to `name`'s source at its pinned commit, downloading the tarball once."
     repo, sha, sub = SRCS[name]
@@ -34,21 +34,21 @@ def fetch_src(name):
         with tarfile.open(fileobj=io.BytesIO(data)) as t: t.extractall(d, filter='data')
     return next(d.iterdir())/sub
 
-# %% ../nbs/00_core.ipynb #f83802db
+# %% ../nbs/00_core.ipynb #efde06df
 def setup_paths():
     "Put Vāgdhenu's `src`, BigVGAN and IndicF5 on `sys.path`."
     for n in SRCS:
         p = str(fetch_src(n))
         if p not in sys.path: sys.path.insert(0, p)
 
-# %% ../nbs/00_core.ipynb #7c35ce0e
+# %% ../nbs/00_core.ipynb #738d354b
 def best_device():
     "cuda, then mps, then cpu."
     import torch
     if torch.cuda.is_available(): return 'cuda'
     return 'mps' if torch.backends.mps.is_available() else 'cpu'
 
-# %% ../nbs/00_core.ipynb #7c413696
+# %% ../nbs/00_core.ipynb #d4a6eaea
 _ACC = re.compile('[\u0951-\u0954\u1CD0-\u1CFF\uA8E0-\uA8FF]')
 def clean(s):
     "Plain Devanagari for the model: no accents, digits or numbered daṇḍas."
@@ -57,12 +57,12 @@ def clean(s):
     s = re.sub('[।॥|]+(\\s*[।॥|]+)*', lambda m: '॥' if '॥' in m[0] else '।', s)
     return re.sub('\\s+', ' ', s).strip()
 
-# %% ../nbs/00_core.ipynb #c4612a74
+# %% ../nbs/00_core.ipynb #5cad091b
 def n_syll(s):
     "Akṣaras in Devanagari `s`: independent vowels and consonants not killed by a virāma."
     return sum(1 for i,c in enumerate(s) if '\u0905'<=c<='\u0914' or ('\u0915'<=c<='\u0939' and s[i+1:i+2]!='्'))
 
-# %% ../nbs/00_core.ipynb #c5c535d6
+# %% ../nbs/00_core.ipynb #b6f814cb
 def chunk_prose(text, max_syll=24):
     "Split prose at daṇḍas, then at word breaks, into pieces of at most `max_syll` akṣaras."
     out = []
@@ -75,7 +75,7 @@ def chunk_prose(text, max_syll=24):
         if cur: out.append(' '.join(cur))
     return out
 
-# %% ../nbs/00_core.ipynb #4b8d7e10
+# %% ../nbs/00_core.ipynb #0b517656
 LN = 'loudnorm=I=-16:TP=-1.5:LRA=11'
 FX = dict(plain=LN,
           warm=f'highpass=f=70,equalizer=f=180:t=q:w=1:g=2.5,deesser=i=0.4,aecho=0.8:0.6:35|70:0.22|0.12,{LN}',
@@ -86,7 +86,7 @@ def polish(src, dst, fx='warm', kbps=96):
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(src), '-af', FX[fx], '-b:a', f'{kbps}k', str(dst)], check=True)
     return Path(dst)
 
-# %% ../nbs/00_core.ipynb #46841523
+# %% ../nbs/00_core.ipynb #3f8ce930
 @dataclass
 class Recitation:
     audio: np.ndarray
@@ -97,17 +97,21 @@ class Recitation:
     @property
     def ms(self): return round(len(self.audio)*1000/self.sr)
     def __add__(self, o): return concat([self, o])
-    def save(self, path, kbps=96, fx=None):
-        "Write a wav, or an mp3 through ffmpeg when `path` ends in .mp3, with the `FX` treatment `fx` when given (timings unchanged)."
+    def save(self, path, kbps=96, fx=None, pitch=0):
+        "Write a wav, or an mp3 through ffmpeg when `path` ends in .mp3, `pitch` semitones up (down if negative) and with the `FX` treatment `fx`; timings unchanged."
         import soundfile as sf
         path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix != '.mp3' and not fx: sf.write(path, self.audio, self.sr); return path
-        buf = io.BytesIO(); sf.write(buf, self.audio, self.sr, format='WAV')
+        au = self.audio
+        if pitch:
+            import librosa
+            au = librosa.effects.pitch_shift(np.asarray(au, np.float32), sr=self.sr, n_steps=pitch)
+        if path.suffix != '.mp3' and not fx: sf.write(path, au, self.sr); return path
+        buf = io.BytesIO(); sf.write(buf, au, self.sr, format='WAV')
         af = ['-af', FX[fx]] if fx else []
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'wav', '-i', '-', *af, *(['-b:a', f'{kbps}k'] if path.suffix == '.mp3' else []), str(path)], input=buf.getvalue(), check=True)
         return path
 
-# %% ../nbs/00_core.ipynb #e207772b
+# %% ../nbs/00_core.ipynb #d9997ede
 def concat(recs, gap=0.8):
     "Join recitations with `gap` seconds of silence, shifting each one's spans."
     recs = L(recs); sr = recs[0].sr; sil = np.zeros(int(gap*sr), np.float32)
@@ -119,7 +123,7 @@ def concat(recs, gap=0.8):
         aus.append(r.audio); pos += len(r.audio)
     return Recitation(np.concatenate(aus), spans, texts, sr)
 
-# %% ../nbs/00_core.ipynb #1daada10
+# %% ../nbs/00_core.ipynb #1b55e207
 def _stitch(self, segs, gaps, fric=False, halant=False):
     "Render-core's stitch, also recording each gated piece's span in samples; each piece keeps `tail` s past its voice, faded over `fade` s, and the last is followed by `pad` s of silence."
     from render_core import gate
@@ -131,7 +135,7 @@ def _stitch(self, segs, gaps, fric=False, halant=False):
     out.append(np.zeros(int(self.pad*SR), np.float32))
     return np.concatenate(out)
 
-# %% ../nbs/00_core.ipynb #1027cbea
+# %% ../nbs/00_core.ipynb #5e78c264
 def _cpu_vocoder(r):
     "Move BigVGAN to the CPU."
     import torch
@@ -143,15 +147,15 @@ def _cpu_vocoder(r):
             return self.g(m).squeeze().numpy().astype(np.float32)
     r._bvgan = types.MethodType(bv, r)
 
-# %% ../nbs/00_core.ipynb #784f2b20
+# %% ../nbs/00_core.ipynb #402e143a
 class Chanter:
     "Sanskrit verse and prose to audio with line spans."
-    def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3, tail=0.18, fade=0.12, pad=0.5):
+    def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3, tail=0.18, fade=0.12, pad=0.5, pace=1.15):
         from huggingface_hub import hf_hub_download
         setup_paths()
         from render_core import Renderer
         device = ifnone(device, best_device())
-        store_attr('voice,device,gap,prose_gap')
+        store_attr('voice,device,gap,prose_gap,pace')
         dl = partial(hf_hub_download, HF)
         bank = fetch_src('vagdhenu')/'reference_bank'/'bank.json'
         self.r = Renderer(dl(VOICES[voice]), dl(VOC), str(bank), device=device, vocab_file=dl('vocab.txt'), nfe=nfe, speed=speed, gap=gap)
@@ -173,7 +177,8 @@ class Chanter:
     def render(self, pieces, ref, seed=60, gap=None):
         "Render cleaned `pieces` against the bank's `ref` (a metre, or gadya), `gap` seconds apart."
         self.r.gap = ifnone(gap, self.gap)
-        sr, au = self.r.render_one(pieces, ref, seed=seed)
+        sps = self.r._get_ref(ref)[2] * self.pace if self.pace != 1 else None   # pace: the reference's seconds a syllable, times this (1.15: unhurried, to chant along)
+        sr, au = self.r.render_one(pieces, ref, seed=seed, sps=sps)
         return Recitation(au, [(round(s*1000/sr), round(e*1000/sr)) for s,e in self.r.spans], pieces, sr)
 
     def chant(self, lines, meter=None, seed=60):

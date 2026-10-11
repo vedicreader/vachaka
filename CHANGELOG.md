@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.1.3
+
+- Voice options, chosen by ear on VedicReader's verses: `Chanter(pace=)` stretches every syllable (1.15 by default, unhurried enough to chant along) and `Recitation.save(pitch=)` shifts the voice in semitones with timing unchanged (applied at save, so Su-śrotā checks and aligns the render as made). `vachaka-recite` takes `--pace` (1.15) and `--pitch` (1.0, a semitone brighter) beside `--fx` (warm).
+
 ## 0.1.2
 
 - Words no longer end abruptly: each piece keeps 180 ms past its voice (Vāgdhenu's gate kept 60 ms) faded over 120 ms, and a part ends on half a second of silence (`Chanter(tail=, fade=, pad=)`).

@@ -7,16 +7,16 @@ Docs: https://vedicreader.github.io/vachaka/check.html.md"""
 # %% auto #0
 __all__ = ['ASR', 'ASR_FILE', 'OFF', 'V', 'BL', 'norm', 'lev', 'cer', 'Ear', 'best_of']
 
-# %% ../nbs/01_check.ipynb #8d25f530
+# %% ../nbs/01_check.ipynb #8ba284de
 import re, tarfile, unicodedata, numpy as np
 from fastcore.utils import *
 from .core import cache, clean, concat, Recitation
 
-# %% ../nbs/01_check.ipynb #b03f5c3b
+# %% ../nbs/01_check.ipynb #f3c36ede
 ASR, ASR_FILE = 'prathoshap/sushrota-sanskrit-asr', 'sushrota_sanskrit_asr_v13b.nemo'
 OFF, V, BL = 4096, 256, 5632
 
-# %% ../nbs/01_check.ipynb #7b98b06b
+# %% ../nbs/01_check.ipynb #c2765dc8
 _DROP = re.compile('[\u0966-\u096F।॥ऽॐ\u0951-\u0954\u1CD0-\u1CFF]')
 _KEEP = re.compile('[^\u0900-\u097F\\s]')
 def norm(s):
@@ -26,7 +26,7 @@ def norm(s):
     s = re.sub('म्(?=\\s|$)', 'ं', s)
     return re.sub('\\s+', ' ', s).strip()
 
-# %% ../nbs/01_check.ipynb #f2e6e26a
+# %% ../nbs/01_check.ipynb #073844b6
 def lev(a, b):
     "Edit distance between sequences `a` and `b`."
     row = list(range(len(b)+1))
@@ -40,7 +40,7 @@ def cer(ref, hyp):
     r, h = [norm(o).replace(' ', '') for o in (ref, hyp)]
     return lev(r, h)/max(1, len(r))
 
-# %% ../nbs/01_check.ipynb #da22a4ae
+# %% ../nbs/01_check.ipynb #8e8fe8fe
 def _cfg(nemo):
     "Su-śrotā's config rewritten for upstream NeMo, cached beside the vachaka sources."
     from omegaconf import OmegaConf, DictConfig
@@ -56,7 +56,7 @@ def _cfg(nemo):
     p.parent.mkdir(parents=True, exist_ok=True); OmegaConf.save(c, p)
     return p
 
-# %% ../nbs/01_check.ipynb #373922ca
+# %% ../nbs/01_check.ipynb #9042057f
 class Ear:
     "Su-śrotā on the CPU: posteriors, transcripts and forced alignment."
     def __init__(self):
@@ -86,7 +86,7 @@ class Ear:
             prev = i
         return norm(''.join(out).replace('▁', ' '))
 
-# %% ../nbs/01_check.ipynb #84aee754
+# %% ../nbs/01_check.ipynb #cce24405
 def best_of(render, ear, text, tries=3, max_cer=0.08, seed=60):
     "Call `render(seed=…)` up to `tries` times, keeping the render closest to `text`."
     best = None
@@ -97,7 +97,7 @@ def best_of(render, ear, text, tries=3, max_cer=0.08, seed=60):
         if best.cer <= max_cer: break
     return best
 
-# %% ../nbs/01_check.ipynb #c6bdbcde
+# %% ../nbs/01_check.ipynb #20828f67
 @patch
 def words(self:Ear, rec, words):
     "For each piece of `rec` and its list of displayed `words`, `[word, start_ms, end_ms]` per word."
