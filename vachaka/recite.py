@@ -8,7 +8,7 @@ Docs: https://vedicreader.github.io/vachaka/recite.html.md"""
 __all__ = ['MATRA', 'word_text', 'pieces', 'piece_text', 'line_times', 'part_voice', 'verses', 'closes', 'recite_part',
            'recite_section', 'shift', 'recite', 'recite_cli']
 
-# %% ../nbs/02_recite.ipynb #ef7639c9
+# %% ../nbs/02_recite.ipynb #8c2e40f4
 import re, json, numpy as np
 from pathlib import Path
 from fastcore.utils import *
@@ -16,7 +16,7 @@ from fastcore.script import call_parse
 from .core import clean, n_syll, concat, Chanter
 from .check import best_of
 
-# %% ../nbs/02_recite.ipynb #2c08075d
+# %% ../nbs/02_recite.ipynb #62ec47f8
 _DANDA = re.compile('[।॥|]')
 def word_text(w): return clean(w).strip(' ।॥')
 
@@ -39,10 +39,10 @@ def pieces(lines, prose=False, max_syll=24, max_verse=44):
     if cur: close()
     return out
 
-# %% ../nbs/02_recite.ipynb #21d1918d
+# %% ../nbs/02_recite.ipynb #3c3e61e8
 def piece_text(p): return ' '.join(o for o in (word_text(w) for _,w in p) if o)
 
-# %% ../nbs/02_recite.ipynb #6e1469e5
+# %% ../nbs/02_recite.ipynb #cec10e3c
 def line_times(n, ps, words):
     "Per line, `dict(s, e, w)` from the pieces' word timings; None for a line with no words."
     out = [None]*n
@@ -55,14 +55,14 @@ def line_times(n, ps, words):
         if d and d['s'] is None: d['s'] = d['e'] = d['w'][0][1]
     return out
 
-# %% ../nbs/02_recite.ipynb #ad730622
+# %% ../nbs/02_recite.ipynb #1834b3c8
 MATRA = {'āryā', 'gīti', 'upagīti', 'udgīti', 'āryāgīti'}
 def part_voice(ch, meter):
     "`(kind, ref)` for a part in metre `meter` (None for prose)."
     if not meter or meter in MATRA: return 'read', 'anuṣṭubh'
     return 'chant', ch.bank_ref(meter) or 'vasantatilaka'
 
-# %% ../nbs/02_recite.ipynb #79a94e7e
+# %% ../nbs/02_recite.ipynb #71d098ee
 def verses(lines):
     "Group line indices into verses, each closing on a line holding a double daṇḍa."
     out, cur = [], []
@@ -74,7 +74,7 @@ def verses(lines):
 
 def closes(l): return '॥' in l or '||' in l
 
-# %% ../nbs/02_recite.ipynb #30171255
+# %% ../nbs/02_recite.ipynb #3ca0bee9
 def recite_part(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
     "Lines rendered in one voice: a `Recitation` and its kind, reference and per-line timings."
     text = ' '.join(word_text(w) for l in lines for w in l.split())
@@ -88,7 +88,7 @@ def recite_part(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
     r = best_of(lambda seed: ch.render([piece_text(p) for p in ps], ref, seed, gap), ear, text, tries, max_cer)
     return r, dict(kind=kind, ref=ref, cer=round(r.cer, 3), lines=line_times(len(lines), ps, ear.words(r, [[w for _,w in p] for p in ps])))
 
-# %% ../nbs/02_recite.ipynb #37dd833b
+# %% ../nbs/02_recite.ipynb #d77baefd
 def recite_section(ch, ear, lines, kind=None, ref=None, parts=None, gap=0.8, **kw):
     "One section's lines to a `Recitation` and its parts' kinds, references, error rates and per-line timings."
     if parts: groups = [(p['lines'], *part_voice(ch, p.get('meter'))) for p in parts]
@@ -105,7 +105,7 @@ def recite_section(ch, ear, lines, kind=None, ref=None, parts=None, gap=0.8, **k
     kinds = {p['kind'] for p in parts}
     return r, dict(kind=kinds.pop() if len(kinds) == 1 else 'mixed', ref=parts[0]['ref'], cer=r.cer, parts=parts, lines=out)
 
-# %% ../nbs/02_recite.ipynb #7a602ce7
+# %% ../nbs/02_recite.ipynb #c2fee734
 def shift(info, off):
     "Move a section's timings `off` ms later."
     for d in info['lines']:
@@ -114,7 +114,7 @@ def shift(info, off):
         for w in d['w']: w[1] += off; w[2] += off
     return info
 
-# %% ../nbs/02_recite.ipynb #0fd27d95
+# %% ../nbs/02_recite.ipynb #32be49dc
 def recite(ch, ear, sections, gap=1.2, **kw):
     "Sections (each `dict(lines=…, kind=…, ref=…)`) to one `Recitation` and per-section timings."
     recs, infos, pos = [], [], 0
@@ -123,7 +123,7 @@ def recite(ch, ear, sections, gap=1.2, **kw):
         infos.append(shift(info, pos)); recs.append(r); pos += r.ms + round(gap*1000)
     return concat(recs, gap), infos
 
-# %% ../nbs/02_recite.ipynb #add0479f
+# %% ../nbs/02_recite.ipynb #33d40fbd
 @call_parse
 def recite_cli(jobs:str, results:str, voice:str='steer', tries:int=3, max_cer:float=0.08):
     "Render a jsonl of jobs, appending timings to a jsonl of results."
