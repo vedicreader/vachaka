@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vachaka"
 dynamic = ["version"]
-description = "High-level Sanskrit recitation from text: Vāgdhenu chant and prose voices with pāda timings"
+description = "High-level Sanskrit recitation from text: Vāgdhenu chant and prose voices with line and word timings"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = {text = "Apache-2.0"}
