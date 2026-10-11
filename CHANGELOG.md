@@ -2,6 +2,12 @@
 
 <!-- do not remove -->
 
+## 0.1.1
+
+- A section is recited in parts, each in one voice, instead of all in one. The caller can pass the parts, `dict(lines=[…], meter=…)`, with metres from a better detector (VedicReader passes ganapati's): a metre in Vāgdhenu's bank is chanted against its reference, another vṛtta against vasantatilakā, and the āryā family or no metre is read. A commentary section that opens with verses now chants them and reads its prose.
+- Without parts, a section splits into verses at double daṇḍas and Vāgdhenu's detector names each, but only a verse that closes on a double daṇḍa is chanted: its anuṣṭubh test passed a 32-syllable prose sentence (Nyāyavṛtti 1.1), and missed a mālinī that ganapati finds.
+- `Chanter.bank_ref` finds the bank's reference for a metre in any spelling. Results carry `parts` per section, and `kind` is `mixed` when they differ.
+
 ## 0.1.0
 
 - First release. `vachaka.core.Chanter` chants a verse from its lines against Vāgdhenu's reference for the detected metre, and reads prose in chunks of at most 24 akṣaras against the anuṣṭubh or gadya reference; each render comes back as a `Recitation` with one `(start_ms, end_ms)` per piece. Runs on CUDA, on Apple silicon (DiT on MPS, BigVGAN on the CPU, since MPS rejects its transposed convolution) or on the CPU.

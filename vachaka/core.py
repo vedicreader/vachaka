@@ -8,14 +8,14 @@ Docs: https://vedicreader.github.io/vachaka/core.html.md"""
 __all__ = ['SRCS', 'HF', 'VOICES', 'VOC', 'SR', 'cache', 'fetch_src', 'setup_paths', 'best_device', 'clean', 'n_syll',
            'chunk_prose', 'Recitation', 'concat', 'Chanter']
 
-# %% ../nbs/00_core.ipynb #090d1b90
-import os, re, sys, io, tarfile, types, subprocess, urllib.request, numpy as np
+# %% ../nbs/00_core.ipynb #46430942
+import os, re, sys, io, tarfile, types, subprocess, unicodedata, urllib.request, numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
 from fastcore.utils import *
 os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
 
-# %% ../nbs/00_core.ipynb #4e642b5c
+# %% ../nbs/00_core.ipynb #c8a76256
 SRCS = dict(vagdhenu=('prathoshap/vagdhenu', 'c18927a8a77775753e32248177a5a6bea1019a12', 'src'),
             bigvgan=('NVIDIA/BigVGAN', '7d2b454564a6c7d014227f635b7423881f14bdac', ''),
             indicf5=('ai4bharat/IndicF5', '13f7c4d627cc10111aea8fe9c0039462cacacdc7', ''))
@@ -24,7 +24,7 @@ VOICES = dict(steer='voice_steer_ema_2026-06-17.pt', armA='voice_armA_ema_2026-0
 VOC, SR = 'voc_bigvgan_EMA_2026-06-11.pth', 24000
 cache = Path(os.environ.get('VACHAKA_CACHE', '~/.cache/vachaka')).expanduser()
 
-# %% ../nbs/00_core.ipynb #ccc2b95e
+# %% ../nbs/00_core.ipynb #253f673e
 def fetch_src(name):
     "Path to `name`'s source at its pinned commit, downloading the tarball once."
     repo, sha, sub = SRCS[name]
@@ -34,21 +34,21 @@ def fetch_src(name):
         with tarfile.open(fileobj=io.BytesIO(data)) as t: t.extractall(d, filter='data')
     return next(d.iterdir())/sub
 
-# %% ../nbs/00_core.ipynb #6d6df49d
+# %% ../nbs/00_core.ipynb #6e4b6146
 def setup_paths():
     "Put Vāgdhenu's `src`, BigVGAN and IndicF5 on `sys.path`."
     for n in SRCS:
         p = str(fetch_src(n))
         if p not in sys.path: sys.path.insert(0, p)
 
-# %% ../nbs/00_core.ipynb #14475476
+# %% ../nbs/00_core.ipynb #ddf489e2
 def best_device():
     "cuda, then mps, then cpu."
     import torch
     if torch.cuda.is_available(): return 'cuda'
     return 'mps' if torch.backends.mps.is_available() else 'cpu'
 
-# %% ../nbs/00_core.ipynb #2afd6bc5
+# %% ../nbs/00_core.ipynb #08d98ac1
 _ACC = re.compile('[\u0951-\u0954\u1CD0-\u1CFF\uA8E0-\uA8FF]')
 def clean(s):
     "Plain Devanagari for the model: no accents, digits or numbered daṇḍas."
@@ -57,12 +57,12 @@ def clean(s):
     s = re.sub('[।॥|]+(\\s*[।॥|]+)*', lambda m: '॥' if '॥' in m[0] else '।', s)
     return re.sub('\\s+', ' ', s).strip()
 
-# %% ../nbs/00_core.ipynb #9e0f1501
+# %% ../nbs/00_core.ipynb #9d6c7859
 def n_syll(s):
     "Akṣaras in Devanagari `s`: independent vowels and consonants not killed by a virāma."
     return sum(1 for i,c in enumerate(s) if '\u0905'<=c<='\u0914' or ('\u0915'<=c<='\u0939' and s[i+1:i+2]!='्'))
 
-# %% ../nbs/00_core.ipynb #9ae6f95a
+# %% ../nbs/00_core.ipynb #1e841240
 def chunk_prose(text, max_syll=24):
     "Split prose at daṇḍas, then at word breaks, into pieces of at most `max_syll` akṣaras."
     out = []
@@ -75,7 +75,7 @@ def chunk_prose(text, max_syll=24):
         if cur: out.append(' '.join(cur))
     return out
 
-# %% ../nbs/00_core.ipynb #ef795966
+# %% ../nbs/00_core.ipynb #799b1a8d
 @dataclass
 class Recitation:
     audio: np.ndarray
@@ -95,7 +95,7 @@ class Recitation:
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'wav', '-i', '-', '-b:a', f'{kbps}k', str(path)], input=buf.getvalue(), check=True)
         return path
 
-# %% ../nbs/00_core.ipynb #9bce14fd
+# %% ../nbs/00_core.ipynb #98fc2e92
 def concat(recs, gap=0.8):
     "Join recitations with `gap` seconds of silence, shifting each one's spans."
     recs = L(recs); sr = recs[0].sr; sil = np.zeros(int(gap*sr), np.float32)
@@ -107,7 +107,7 @@ def concat(recs, gap=0.8):
         aus.append(r.audio); pos += len(r.audio)
     return Recitation(np.concatenate(aus), spans, texts, sr)
 
-# %% ../nbs/00_core.ipynb #3681f137
+# %% ../nbs/00_core.ipynb #b75fa49b
 def _stitch(self, segs, gaps, fric=False, halant=False):
     "Render-core's stitch, also recording each gated piece's span in samples."
     from render_core import gate
@@ -118,7 +118,7 @@ def _stitch(self, segs, gaps, fric=False, halant=False):
         if i < last: gp = gaps[i] if i < len(gaps) else gaps[-1]; out.append(gp); pos += len(gp)
     return np.concatenate(out)
 
-# %% ../nbs/00_core.ipynb #a44d091b
+# %% ../nbs/00_core.ipynb #2b810843
 def _cpu_vocoder(r):
     "Move BigVGAN to the CPU."
     import torch
@@ -130,14 +130,14 @@ def _cpu_vocoder(r):
             return self.g(m).squeeze().numpy().astype(np.float32)
     r._bvgan = types.MethodType(bv, r)
 
-# %% ../nbs/00_core.ipynb #75b3b396
+# %% ../nbs/00_core.ipynb #10ca87ac
 class Chanter:
     "Sanskrit verse and prose to audio with line spans."
     def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3):
         from huggingface_hub import hf_hub_download
         setup_paths()
-        from render_core import Renderer, detect_meter_key
-        self.detect, device = detect_meter_key, ifnone(device, best_device())
+        from render_core import Renderer
+        device = ifnone(device, best_device())
         store_attr('voice,device,gap,prose_gap')
         dl = partial(hf_hub_download, HF)
         bank = fetch_src('vagdhenu')/'reference_bank'/'bank.json'
@@ -146,7 +146,15 @@ class Chanter:
         if device == 'mps': _cpu_vocoder(self.r)
 
     def meters(self): return self.r.meters()
-    def meter(self, lines): return self.detect(' । '.join(lines)) or ''
+    def meter(self, lines):
+        "The metre of a verse given as its lines, by ganapati's scansion, or ''."
+        from ganapati.metre import detect_meter
+        m = detect_meter('\n'.join(lines))
+        return m.name.value if m and m.name else ''
+    def bank_ref(self, name):
+        "The bank's reference for metre `name` (any spelling: IAST, ascii, the wav's stem), or None."
+        k = ''.join(c for c in unicodedata.normalize('NFKD', name or '') if c.isascii() and c.isalnum()).lower()
+        return next((o for o in ((name or '').lower(), k) if o in self.r._lut), None)
 
     def render(self, pieces, ref, seed=60, gap=None):
         "Render cleaned `pieces` against the bank's `ref` (a metre, or gadya), `gap` seconds apart."
