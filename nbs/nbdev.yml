@@ -1,0 +1,14 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "vachaka"
+  site-url: "https://vedicreader.github.io/vachaka"
+  description: "High-level Sanskrit recitation from text: Vāgdhenu chant and prose voices with pāda timings"
+  repo-branch: main
+  repo-url: "https://github.com/vedicreader/vachaka"
+
+format-links:
+  - html
+  - format: commonmark
+    text: Markdown
