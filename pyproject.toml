@@ -36,6 +36,9 @@ dependencies = [
 Repository = "https://github.com/vedicreader/vachaka"
 Documentation = "https://vedicreader.github.io/vachaka/"
 
+[project.scripts]
+vachaka-recite = "vachaka.recite:recite_cli"
+
 [project.entry-points.nbdev]
 vachaka = "vachaka._modidx:d"
 

@@ -8,13 +8,14 @@ Docs: https://vedicreader.github.io/vachaka/core.html.md"""
 __all__ = ['SRCS', 'HF', 'VOICES', 'VOC', 'SR', 'cache', 'fetch_src', 'setup_paths', 'best_device', 'clean', 'n_syll',
            'chunk_prose', 'Recitation', 'concat', 'Chanter']
 
-# %% ../nbs/00_core.ipynb #26962300
+# %% ../nbs/00_core.ipynb #07a4d1ab
 import os, re, sys, io, tarfile, types, subprocess, urllib.request, numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
 from fastcore.utils import *
+os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
 
-# %% ../nbs/00_core.ipynb #8beb8a81
+# %% ../nbs/00_core.ipynb #7ca9cd18
 SRCS = dict(vagdhenu=('prathoshap/vagdhenu', 'c18927a8a77775753e32248177a5a6bea1019a12', 'src'),
             bigvgan=('NVIDIA/BigVGAN', '7d2b454564a6c7d014227f635b7423881f14bdac', ''))
 HF = 'prathoshap/vagdhenu'
@@ -22,7 +23,7 @@ VOICES = dict(steer='voice_steer_ema_2026-06-17.pt', armA='voice_armA_ema_2026-0
 VOC, SR = 'voc_bigvgan_EMA_2026-06-11.pth', 24000
 cache = Path(os.environ.get('VACHAKA_CACHE', '~/.cache/vachaka')).expanduser()
 
-# %% ../nbs/00_core.ipynb #2053f7cf
+# %% ../nbs/00_core.ipynb #f2fac86b
 def fetch_src(name):
     "Path to `name`'s source at its pinned commit, downloading the tarball once."
     repo, sha, sub = SRCS[name]
@@ -32,21 +33,21 @@ def fetch_src(name):
         with tarfile.open(fileobj=io.BytesIO(data)) as t: t.extractall(d, filter='data')
     return next(d.iterdir())/sub
 
-# %% ../nbs/00_core.ipynb #a9da5d7b
+# %% ../nbs/00_core.ipynb #5ddb9d87
 def setup_paths():
     "Put Vāgdhenu's `src` and BigVGAN on `sys.path`."
     for n in SRCS:
         p = str(fetch_src(n))
         if p not in sys.path: sys.path.insert(0, p)
 
-# %% ../nbs/00_core.ipynb #77cb11a2
+# %% ../nbs/00_core.ipynb #4e3d74ae
 def best_device():
     "cuda, then mps, then cpu."
     import torch
     if torch.cuda.is_available(): return 'cuda'
     return 'mps' if torch.backends.mps.is_available() else 'cpu'
 
-# %% ../nbs/00_core.ipynb #2a10bd3b
+# %% ../nbs/00_core.ipynb #76734662
 _ACC = re.compile('[\u0951-\u0954\u1CD0-\u1CFF\uA8E0-\uA8FF]')
 def clean(s):
     "Plain Devanagari for the model: no accents, digits or numbered daṇḍas."
@@ -55,12 +56,12 @@ def clean(s):
     s = re.sub('[।॥|]+(\\s*[।॥|]+)*', lambda m: '॥' if '॥' in m[0] else '।', s)
     return re.sub('\\s+', ' ', s).strip()
 
-# %% ../nbs/00_core.ipynb #7005cb0e
+# %% ../nbs/00_core.ipynb #e8f352be
 def n_syll(s):
     "Akṣaras in Devanagari `s`: independent vowels and consonants not killed by a virāma."
     return sum(1 for i,c in enumerate(s) if '\u0905'<=c<='\u0914' or ('\u0915'<=c<='\u0939' and s[i+1:i+2]!='्'))
 
-# %% ../nbs/00_core.ipynb #f2416e30
+# %% ../nbs/00_core.ipynb #cb68a399
 def chunk_prose(text, max_syll=24):
     "Split prose at daṇḍas, then at word breaks, into pieces of at most `max_syll` akṣaras."
     out = []
@@ -73,7 +74,7 @@ def chunk_prose(text, max_syll=24):
         if cur: out.append(' '.join(cur))
     return out
 
-# %% ../nbs/00_core.ipynb #737a3b90
+# %% ../nbs/00_core.ipynb #1f16ddb4
 @dataclass
 class Recitation:
     audio: np.ndarray
@@ -93,7 +94,7 @@ class Recitation:
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'wav', '-i', '-', '-b:a', f'{kbps}k', str(path)], input=buf.getvalue(), check=True)
         return path
 
-# %% ../nbs/00_core.ipynb #f6ee7e5d
+# %% ../nbs/00_core.ipynb #5c2f47dd
 def concat(recs, gap=0.8):
     "Join recitations with `gap` seconds of silence, shifting each one's spans."
     recs = L(recs); sr = recs[0].sr; sil = np.zeros(int(gap*sr), np.float32)
@@ -105,7 +106,7 @@ def concat(recs, gap=0.8):
         aus.append(r.audio); pos += len(r.audio)
     return Recitation(np.concatenate(aus), spans, texts, sr)
 
-# %% ../nbs/00_core.ipynb #fbadb1d1
+# %% ../nbs/00_core.ipynb #1af2d5b8
 def _stitch(self, segs, gaps, fric=False, halant=False):
     "Render-core's stitch, also recording each gated piece's span in samples."
     from render_core import gate
@@ -116,7 +117,7 @@ def _stitch(self, segs, gaps, fric=False, halant=False):
         if i < last: gp = gaps[i] if i < len(gaps) else gaps[-1]; out.append(gp); pos += len(gp)
     return np.concatenate(out)
 
-# %% ../nbs/00_core.ipynb #fd121c9e
+# %% ../nbs/00_core.ipynb #63af5ea7
 def _cpu_vocoder(r):
     "Move BigVGAN to the CPU."
     import torch
@@ -128,7 +129,7 @@ def _cpu_vocoder(r):
             return self.g(m).squeeze().numpy().astype(np.float32)
     r._bvgan = types.MethodType(bv, r)
 
-# %% ../nbs/00_core.ipynb #1b9a140a
+# %% ../nbs/00_core.ipynb #25890c57
 class Chanter:
     "Sanskrit verse and prose to audio with line spans."
     def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3):
@@ -146,17 +147,18 @@ class Chanter:
     def meters(self): return self.r.meters()
     def meter(self, lines): return self.detect(' । '.join(lines)) or ''
 
-    def _render(self, pieces, meter, seed, gap):
-        self.r.gap = gap
-        sr, au = self.r.render_one(pieces, meter, seed=seed)
+    def render(self, pieces, ref, seed=60, gap=None):
+        "Render cleaned `pieces` against the bank's `ref` (a metre, or gadya), `gap` seconds apart."
+        self.r.gap = ifnone(gap, self.gap)
+        sr, au = self.r.render_one(pieces, ref, seed=seed)
         return Recitation(au, [(round(s*1000/sr), round(e*1000/sr)) for s,e in self.r.spans], pieces, sr)
 
     def chant(self, lines, meter=None, seed=60):
         "Chant one verse given as its lines (a str splits at newlines and daṇḍas); one span per line."
         if isinstance(lines, str): lines = re.split('[\n।॥|]', lines)
         lines = [o for o in (clean(l).strip(' ।॥') for l in lines) if o]
-        return self._render(lines, ifnone(meter, self.meter(lines)) or 'vasantatilaka', seed, self.gap)
+        return self.render(lines, ifnone(meter, self.meter(lines)) or 'vasantatilaka', seed)
 
     def read(self, text, ref='gadya', seed=60, max_syll=24):
         "Read prose against the `ref` reference (gadya, or a metre's); one span per chunk."
-        return self._render(chunk_prose(text, max_syll), ref, seed, self.prose_gap)
+        return self.render(chunk_prose(text, max_syll), ref, seed, self.prose_gap)
