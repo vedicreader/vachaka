@@ -138,8 +138,9 @@ For batches there is a resumable CLI over jsonl: `vachaka-recite jobs.jsonl resu
 ## How it works
 
 [`recite`](https://vedicreader.github.io/vachaka/recite.html#recite) groups display lines into pieces, closing a piece after a daṇḍa, so the two pādas of a hemistich printed on two lines render together, as
-Vāgdhenu expects. A section whose text scans as a known metre is chanted against the reference clip for that metre; anything else is read in chunks
-of at most 24 akṣaras. Vāgdhenu renders each piece separately and joins them with short silences; vachaka records where each piece landed. Su-śrotā
+Vāgdhenu expects. Each verse (closing on a double daṇḍa) is scanned by [ganapati](https://github.com/vedicreader/ganapati): one in a metre from
+Vāgdhenu’s bank is chanted against that metre’s reference clip, another vṛtta against vasantatilakā, and an āryā or anything that does not scan is
+read in chunks of at most 24 akṣaras. So a commentary that quotes a verse chants the verse and reads the rest. Vāgdhenu renders each piece separately and joins them with short silences; vachaka records where each piece landed. Su-śrotā
 then transcribes the whole render, and if the error rate is above 8% the section is rendered again with another seed, keeping the best of three.
 Finally the words of each piece are force-aligned (torchaudio’s CTC aligner on Su-śrotā’s posteriors) inside that piece’s span, so one bad line can’t
 pull the rest out of place.
