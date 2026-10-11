@@ -39,6 +39,11 @@ Documentation = "https://vedicreader.github.io/vachaka/"
 [project.entry-points.nbdev]
 vachaka = "vachaka._modidx:d"
 
+[project.optional-dependencies]
+check = [
+    "nemo-toolkit[asr]>=2.1.0",
+]
+
 [tool.nbdev]
 
 [tool.hatch.metadata]

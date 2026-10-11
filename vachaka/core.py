@@ -8,13 +8,13 @@ Docs: https://vedicreader.github.io/vachaka/core.html.md"""
 __all__ = ['SRCS', 'HF', 'VOICES', 'VOC', 'SR', 'cache', 'fetch_src', 'setup_paths', 'best_device', 'clean', 'n_syll',
            'chunk_prose', 'Recitation', 'concat', 'Chanter']
 
-# %% ../nbs/00_core.ipynb #91d2d460
+# %% ../nbs/00_core.ipynb #26962300
 import os, re, sys, io, tarfile, types, subprocess, urllib.request, numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
 from fastcore.utils import *
 
-# %% ../nbs/00_core.ipynb #0dc09fdf
+# %% ../nbs/00_core.ipynb #8beb8a81
 SRCS = dict(vagdhenu=('prathoshap/vagdhenu', 'c18927a8a77775753e32248177a5a6bea1019a12', 'src'),
             bigvgan=('NVIDIA/BigVGAN', '7d2b454564a6c7d014227f635b7423881f14bdac', ''))
 HF = 'prathoshap/vagdhenu'
@@ -22,7 +22,7 @@ VOICES = dict(steer='voice_steer_ema_2026-06-17.pt', armA='voice_armA_ema_2026-0
 VOC, SR = 'voc_bigvgan_EMA_2026-06-11.pth', 24000
 cache = Path(os.environ.get('VACHAKA_CACHE', '~/.cache/vachaka')).expanduser()
 
-# %% ../nbs/00_core.ipynb #2e551663
+# %% ../nbs/00_core.ipynb #2053f7cf
 def fetch_src(name):
     "Path to `name`'s source at its pinned commit, downloading the tarball once."
     repo, sha, sub = SRCS[name]
@@ -32,21 +32,21 @@ def fetch_src(name):
         with tarfile.open(fileobj=io.BytesIO(data)) as t: t.extractall(d, filter='data')
     return next(d.iterdir())/sub
 
-# %% ../nbs/00_core.ipynb #adc16316
+# %% ../nbs/00_core.ipynb #a9da5d7b
 def setup_paths():
     "Put Vāgdhenu's `src` and BigVGAN on `sys.path`."
     for n in SRCS:
         p = str(fetch_src(n))
         if p not in sys.path: sys.path.insert(0, p)
 
-# %% ../nbs/00_core.ipynb #a184355f
+# %% ../nbs/00_core.ipynb #77cb11a2
 def best_device():
     "cuda, then mps, then cpu."
     import torch
     if torch.cuda.is_available(): return 'cuda'
     return 'mps' if torch.backends.mps.is_available() else 'cpu'
 
-# %% ../nbs/00_core.ipynb #a10c130a
+# %% ../nbs/00_core.ipynb #2a10bd3b
 _ACC = re.compile('[\u0951-\u0954\u1CD0-\u1CFF\uA8E0-\uA8FF]')
 def clean(s):
     "Plain Devanagari for the model: no accents, digits or numbered daṇḍas."
@@ -55,12 +55,12 @@ def clean(s):
     s = re.sub('[।॥|]+(\\s*[।॥|]+)*', lambda m: '॥' if '॥' in m[0] else '।', s)
     return re.sub('\\s+', ' ', s).strip()
 
-# %% ../nbs/00_core.ipynb #5cd87169
+# %% ../nbs/00_core.ipynb #7005cb0e
 def n_syll(s):
     "Akṣaras in Devanagari `s`: independent vowels and consonants not killed by a virāma."
     return sum(1 for i,c in enumerate(s) if '\u0905'<=c<='\u0914' or ('\u0915'<=c<='\u0939' and s[i+1:i+2]!='्'))
 
-# %% ../nbs/00_core.ipynb #68151928
+# %% ../nbs/00_core.ipynb #f2416e30
 def chunk_prose(text, max_syll=24):
     "Split prose at daṇḍas, then at word breaks, into pieces of at most `max_syll` akṣaras."
     out = []
@@ -73,13 +73,14 @@ def chunk_prose(text, max_syll=24):
         if cur: out.append(' '.join(cur))
     return out
 
-# %% ../nbs/00_core.ipynb #5c7eb18f
+# %% ../nbs/00_core.ipynb #737a3b90
 @dataclass
 class Recitation:
     audio: np.ndarray
     spans: list = field(default_factory=list)
     texts: list = field(default_factory=list)
     sr: int = SR
+    cer: float = None
     @property
     def ms(self): return round(len(self.audio)*1000/self.sr)
     def __add__(self, o): return concat([self, o])
@@ -92,7 +93,7 @@ class Recitation:
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'wav', '-i', '-', '-b:a', f'{kbps}k', str(path)], input=buf.getvalue(), check=True)
         return path
 
-# %% ../nbs/00_core.ipynb #e2b9d4e1
+# %% ../nbs/00_core.ipynb #f6ee7e5d
 def concat(recs, gap=0.8):
     "Join recitations with `gap` seconds of silence, shifting each one's spans."
     recs = L(recs); sr = recs[0].sr; sil = np.zeros(int(gap*sr), np.float32)
@@ -104,7 +105,7 @@ def concat(recs, gap=0.8):
         aus.append(r.audio); pos += len(r.audio)
     return Recitation(np.concatenate(aus), spans, texts, sr)
 
-# %% ../nbs/00_core.ipynb #c410b189
+# %% ../nbs/00_core.ipynb #fbadb1d1
 def _stitch(self, segs, gaps, fric=False, halant=False):
     "Render-core's stitch, also recording each gated piece's span in samples."
     from render_core import gate
@@ -115,7 +116,7 @@ def _stitch(self, segs, gaps, fric=False, halant=False):
         if i < last: gp = gaps[i] if i < len(gaps) else gaps[-1]; out.append(gp); pos += len(gp)
     return np.concatenate(out)
 
-# %% ../nbs/00_core.ipynb #1a2f08a9
+# %% ../nbs/00_core.ipynb #fd121c9e
 def _cpu_vocoder(r):
     "Move BigVGAN to the CPU."
     import torch
@@ -127,7 +128,7 @@ def _cpu_vocoder(r):
             return self.g(m).squeeze().numpy().astype(np.float32)
     r._bvgan = types.MethodType(bv, r)
 
-# %% ../nbs/00_core.ipynb #4aac2fe7
+# %% ../nbs/00_core.ipynb #1b9a140a
 class Chanter:
     "Sanskrit verse and prose to audio with line spans."
     def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3):
@@ -156,6 +157,6 @@ class Chanter:
         lines = [o for o in (clean(l).strip(' ।॥') for l in lines) if o]
         return self._render(lines, ifnone(meter, self.meter(lines)) or 'vasantatilaka', seed, self.gap)
 
-    def read(self, text, seed=60, max_syll=24):
-        "Read prose in the gadya voice; one span per chunk."
-        return self._render(chunk_prose(text, max_syll), 'gadya', seed, self.prose_gap)
+    def read(self, text, ref='gadya', seed=60, max_syll=24):
+        "Read prose against the `ref` reference (gadya, or a metre's); one span per chunk."
+        return self._render(chunk_prose(text, max_syll), ref, seed, self.prose_gap)
