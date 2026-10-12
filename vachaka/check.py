@@ -86,13 +86,20 @@ class Ear:
             prev = i
         return norm(''.join(out).replace('▁', ' '))
 
+# %% ../nbs/01_check.ipynb #b8c4671c
+@patch
+def heard(self:Ear, rec):
+    "What Su-śrotā hears of `rec`, each piece of `spans` on its own, joined."
+    if not getattr(rec, 'spans', None): return self.hear(rec.audio, rec.sr)
+    return ' '.join(self.hear(rec.audio[int(s*rec.sr/1000):int(e*rec.sr/1000)], rec.sr) for s,e in rec.spans)
+
 # %% ../nbs/01_check.ipynb #cce24405
 def best_of(render, ear, text, tries=3, max_cer=0.08, seed=60):
     "Call `render(seed=…)` up to `tries` times, keeping the render closest to `text`."
     best = None
     for k in range(tries):
         r = render(seed=seed+7*k)
-        r.cer = cer(text, ear.hear(r.audio, r.sr))
+        r.cer = cer(text, ear.heard(r))
         if best is None or r.cer < best.cer: best = r
         if best.cer <= max_cer: break
     return best
