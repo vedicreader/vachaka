@@ -26,7 +26,7 @@ cache = Path(os.environ.get('VACHAKA_CACHE', '~/.cache/vachaka')).expanduser()
 
 # %% ../nbs/00_core.ipynb #ff40bf76
 def fetch_src(name):
-    "Path to `name`'s source at its pinned commit, downloading the tarball once."
+    "The path to the source code of `name` at its fixed commit, downloaded on first use."
     repo, sha, sub = SRCS[name]
     d = cache/f'{name}-{sha[:10]}'
     if not d.exists():
@@ -43,7 +43,7 @@ def setup_paths():
 
 # %% ../nbs/00_core.ipynb #738d354b
 def best_device():
-    "cuda, then mps, then cpu."
+    "The best available torch device: cuda, then mps, then cpu."
     import torch
     if torch.cuda.is_available(): return 'cuda'
     return 'mps' if torch.backends.mps.is_available() else 'cpu'
@@ -51,7 +51,7 @@ def best_device():
 # %% ../nbs/00_core.ipynb #d4a6eaea
 _ACC = re.compile('[\u0951-\u0954\u1CD0-\u1CFF\uA8E0-\uA8FF]')
 def clean(s):
-    "Plain Devanagari for the model: no accents, digits or numbered daṇḍas."
+    "Plain Devanagari for the model, without accents, digits or verse numbers between daṇḍas."
     s = _ACC.sub('', s)
     s = re.sub('[0-9\u0966-\u096F]+', '', s)
     s = re.sub('[।॥|]+(\\s*[।॥|]+)*', lambda m: '॥' if '॥' in m[0] else '।', s)
@@ -59,12 +59,12 @@ def clean(s):
 
 # %% ../nbs/00_core.ipynb #5cad091b
 def n_syll(s):
-    "Akṣaras in Devanagari `s`: independent vowels and consonants not killed by a virāma."
+    "The number of akṣaras in Devanagari `s`: independent vowels and consonants without a virāma."
     return sum(1 for i,c in enumerate(s) if '\u0905'<=c<='\u0914' or ('\u0915'<=c<='\u0939' and s[i+1:i+2]!='्'))
 
 # %% ../nbs/00_core.ipynb #b6f814cb
 def chunk_prose(text, max_syll=24):
-    "Split prose at daṇḍas, then at word breaks, into pieces of at most `max_syll` akṣaras."
+    "Split prose at daṇḍas, then between words, into pieces of at most `max_syll` akṣaras."
     out = []
     for sent in re.split('[।॥|]', clean(text)):
         cur, cs = [], 0
@@ -82,7 +82,7 @@ FX = dict(plain=LN,
           phone=f'highpass=f=90,acompressor=threshold=-20dB:ratio=2.5:attack=10:release=150,equalizer=f=3000:t=q:w=1.2:g=3,{LN}')
 
 def polish(src, dst, fx='warm', kbps=96):
-    "Apply the `FX` treatment `fx` to an audio file, writing `dst`."
+    "Apply the sound treatment `FX[fx]` to audio file `src` and write it to `dst`."
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(src), '-af', FX[fx], '-b:a', f'{kbps}k', str(dst)], check=True)
     return Path(dst)
 
@@ -98,7 +98,7 @@ class Recitation:
     def ms(self): return round(len(self.audio)*1000/self.sr)
     def __add__(self, o): return concat([self, o])
     def save(self, path, kbps=96, fx=None, pitch=0):
-        "Write a wav, or an mp3 through ffmpeg when `path` ends in .mp3, `pitch` semitones up (down if negative) and with the `FX` treatment `fx`; timings unchanged."
+        "Write a wav file, or an mp3 when `path` ends in .mp3, shifted `pitch` semitones and with the sound treatment `fx`."
         import soundfile as sf
         path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
         au = self.audio
@@ -113,7 +113,7 @@ class Recitation:
 
 # %% ../nbs/00_core.ipynb #d9997ede
 def concat(recs, gap=0.8):
-    "Join recitations with `gap` seconds of silence, shifting each one's spans."
+    "Join recitations with `gap` seconds of silence between them, moving their spans to match."
     recs = L(recs); sr = recs[0].sr; sil = np.zeros(int(gap*sr), np.float32)
     aus, spans, texts, pos = [], [], [], 0
     for i,r in enumerate(recs):
@@ -149,7 +149,7 @@ def _cpu_vocoder(r):
 
 # %% ../nbs/00_core.ipynb #402e143a
 class Chanter:
-    "Sanskrit verse and prose to audio with line spans."
+    "Renders Sanskrit verse and prose to audio with Vāgdhenu, with a time span per line."
     def __init__(self, voice='steer', device=None, nfe=64, speed=0.9, gap=0.55, prose_gap=0.3, tail=0.18, fade=0.12, pad=0.5, pace=1.15):
         from huggingface_hub import hf_hub_download
         setup_paths()
@@ -165,28 +165,28 @@ class Chanter:
 
     def meters(self): return self.r.meters()
     def meter(self, lines):
-        "The metre of a verse given as its lines, by ganapati's scansion, or ''."
+        "The metre of a verse given as its lines, found by ganapati, or ''."
         from ganapati.metre import detect_meter
         m = detect_meter('\n'.join(lines))
         return m.name.value if m and m.name else ''
     def bank_ref(self, name):
-        "The bank's reference for metre `name` (any spelling: IAST, ascii, the wav's stem), or None."
+        "The bank's reference for metre `name`, in IAST, ASCII or file-name spelling, or None."
         k = ''.join(c for c in unicodedata.normalize('NFKD', name or '') if c.isascii() and c.isalnum()).lower()
         return next((o for o in ((name or '').lower(), k) if o in self.r._lut), None)
 
     def render(self, pieces, ref, seed=60, gap=None):
-        "Render cleaned `pieces` against the bank's `ref` (a metre, or gadya), `gap` seconds apart."
+        "Render cleaned `pieces` against the reference `ref`, a metre or gadya, with `gap` seconds between them."
         self.r.gap = ifnone(gap, self.gap)
         sps = self.r._get_ref(ref)[2] * self.pace if self.pace != 1 else None   # pace: the reference's seconds a syllable, times this (1.15: unhurried, to chant along)
         sr, au = self.r.render_one(pieces, ref, seed=seed, sps=sps)
         return Recitation(au, [(round(s*1000/sr), round(e*1000/sr)) for s,e in self.r.spans], pieces, sr)
 
     def chant(self, lines, meter=None, seed=60):
-        "Chant one verse given as its lines (a str splits at newlines and daṇḍas); one span per line."
+        "Chant one verse given as its lines, or as a string split at newlines and daṇḍas, with one span per line."
         if isinstance(lines, str): lines = re.split('[\n।॥|]', lines)
         lines = [o for o in (clean(l).strip(' ।॥') for l in lines) if o]
         return self.render(lines, ifnone(meter, self.meter(lines)) or 'vasantatilaka', seed)
 
     def read(self, text, ref='gadya', seed=60, max_syll=24):
-        "Read prose against the `ref` reference (gadya, or a metre's); one span per chunk."
+        "Read prose against the reference `ref`, gadya by default, with one span per chunk."
         return self.render(chunk_prose(text, max_syll), ref, seed, self.prose_gap)

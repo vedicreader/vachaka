@@ -20,7 +20,7 @@ OFF, V, BL = 4096, 256, 5632
 _DROP = re.compile('[\u0966-\u096F।॥ऽॐ\u0951-\u0954\u1CD0-\u1CFF]')
 _KEEP = re.compile('[^\u0900-\u097F\\s]')
 def norm(s):
-    "Text as Su-śrotā writes it: NFC, no accents, daṇḍas or avagraha, word-final म् as anusvāra, doubled marks collapsed."
+    "Text in the form Su-śrotā writes it: NFC, without accents, digits, daṇḍas or avagraha, and with word-final म् as anusvāra."
     s = _KEEP.sub(' ', _DROP.sub(' ', unicodedata.normalize('NFC', s)))
     s = re.sub('(.)(?=\\1)', lambda m: '' if unicodedata.category(m[1]) in ('Mn', 'Mc') else m[1], s)
     s = re.sub('म्(?=\\s|$)', 'ं', s)
@@ -36,7 +36,7 @@ def lev(a, b):
     return row[-1]
 
 def cer(ref, hyp):
-    "Character error rate of `hyp` against `ref`, both normalised, spaces ignored (sandhi spacing varies)."
+    "The character error rate of `hyp` against `ref`, both normalised and with spaces ignored."
     r, h = [norm(o).replace(' ', '') for o in (ref, hyp)]
     return lev(r, h)/max(1, len(r))
 
@@ -58,7 +58,7 @@ def _cfg(nemo):
 
 # %% ../nbs/01_check.ipynb #9042057f
 class Ear:
-    "Su-śrotā on the CPU: posteriors, transcripts and forced alignment."
+    "Su-śrotā on the CPU, for transcripts and word timings."
     def __init__(self):
         import logging, nemo.collections.asr as na
         from huggingface_hub import hf_hub_download
@@ -68,7 +68,7 @@ class Ear:
         self.tok = self.m.tokenizer.tokenizers_dict['sa']
 
     def post(self, audio, sr):
-        "Log-posteriors, frames × (blank + 256 Sanskrit tokens), and the ms per frame."
+        "Log-probabilities of the blank and the 256 Sanskrit tokens for each frame, and the milliseconds per frame."
         import torch, librosa
         w = librosa.resample(np.asarray(audio, np.float32), orig_sr=sr, target_sr=16000) if sr != 16000 else np.asarray(audio, np.float32)
         with torch.no_grad():
@@ -79,7 +79,7 @@ class Ear:
         return P, len(w)/16/len(P)
 
     def hear(self, audio, sr):
-        "What Su-śrotā hears: greedy CTC decode."
+        "Transcribe `audio`, returning the normalised text Su-śrotā hears."
         ids, out, prev = self.post(audio, sr)[0].argmax(1), [], -1
         for i in ids:
             if i != prev and i: out.append(self.tok.ids_to_tokens([int(i)-1])[0])
@@ -89,13 +89,13 @@ class Ear:
 # %% ../nbs/01_check.ipynb #b8c4671c
 @patch
 def heard(self:Ear, rec):
-    "What Su-śrotā hears of `rec`, each piece of `spans` on its own, joined."
+    "Transcribe `rec` one piece of its `spans` at a time and join the transcripts."
     if not getattr(rec, 'spans', None): return self.hear(rec.audio, rec.sr)
     return ' '.join(self.hear(rec.audio[int(s*rec.sr/1000):int(e*rec.sr/1000)], rec.sr) for s,e in rec.spans)
 
 # %% ../nbs/01_check.ipynb #cce24405
 def best_of(render, ear, text, tries=3, max_cer=0.08, seed=60):
-    "Call `render(seed=…)` up to `tries` times, keeping the render closest to `text`."
+    "Call `render(seed=...)` up to `tries` times and keep the render whose transcript is closest to `text`."
     best = None
     for k in range(tries):
         r = render(seed=seed+7*k)
@@ -107,7 +107,7 @@ def best_of(render, ear, text, tries=3, max_cer=0.08, seed=60):
 # %% ../nbs/01_check.ipynb #20828f67
 @patch
 def words(self:Ear, rec, words):
-    "For each piece of `rec` and its list of displayed `words`, `[word, start_ms, end_ms]` per word."
+    "The `[word, start_ms, end_ms]` of each displayed word, for each piece of `rec`."
     import torch, torchaudio.functional as F
     P, fms = self.post(rec.audio, rec.sr)
     res = []

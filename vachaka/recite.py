@@ -21,7 +21,7 @@ _DANDA = re.compile('[।॥|]')
 def word_text(w): return clean(w).strip(' ।॥')
 
 def pieces(lines, prose=False, max_syll=24, max_verse=44):
-    "Group display `lines` into pieces, each a list of `(line_index, word)`."
+    "Group display `lines` into render pieces, each a list of `(line_index, word)`."
     out, cur, cs = [], [], 0
     def close():
         nonlocal cur, cs
@@ -44,7 +44,7 @@ def piece_text(p): return ' '.join(o for o in (word_text(w) for _,w in p) if o)
 
 # %% ../nbs/02_recite.ipynb #b4b03f4a
 def line_times(n, ps, words):
-    "Per line, `dict(s, e, w)` from the pieces' word timings; None for a line with no words."
+    "One `dict(s, e, w)` per line from the pieces' word timings, or None for a line with no words."
     out = [None]*n
     for p, ws in zip(ps, words):
         for (i,w), (_, s, e) in zip(p, ws):
@@ -58,13 +58,13 @@ def line_times(n, ps, words):
 # %% ../nbs/02_recite.ipynb #5c8c3727
 MATRA = {'āryā', 'gīti', 'upagīti', 'udgīti', 'āryāgīti'}
 def part_voice(ch, meter):
-    "`(kind, ref)` for a part in metre `meter` (None for prose)."
+    "The voice `(kind, ref)` for a part in metre `meter`, where None means prose."
     if not meter or meter in MATRA: return 'read', 'anuṣṭubh'
     return 'chant', ch.bank_ref(meter) or 'vasantatilaka'
 
 # %% ../nbs/02_recite.ipynb #29980bf5
 def verses(lines):
-    "Group line indices into verses, each closing on a line holding a double daṇḍa."
+    "Group line indices into verses, each ending on a line with a double daṇḍa."
     out, cur = [], []
     for i,l in enumerate(lines):
         cur.append(i)
@@ -76,7 +76,7 @@ def closes(l): return '॥' in l or '||' in l
 
 # %% ../nbs/02_recite.ipynb #defbc4db
 def recite_part(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
-    "Lines rendered in one voice: a `Recitation` and its kind, reference and per-line timings."
+    "Render `lines` in one voice, returning the `Recitation` and its kind, reference, error rate and line timings."
     text = ' '.join(word_text(w) for l in lines for w in l.split())
     if kind is None:
         meter = ch.meter([clean(l) for l in lines])
@@ -90,7 +90,7 @@ def recite_part(ch, ear, lines, kind=None, ref=None, tries=3, max_cer=0.08):
 
 # %% ../nbs/02_recite.ipynb #ea2d6c3c
 def recite_section(ch, ear, lines, kind=None, ref=None, parts=None, gap=0.8, **kw):
-    "One section's lines to a `Recitation` and its parts' kinds, references, error rates and per-line timings."
+    "Recite one section's lines, returning the `Recitation` and its parts, error rates and line timings."
     if parts: groups = [(p['lines'], *part_voice(ch, p.get('meter'))) for p in parts]
     else: groups = [(g, kind, ref) for g in ([list(range(len(lines)))] if kind else verses(lines))]
     groups = [o for o in groups if any(word_text(w) for i in o[0] for w in lines[i].split())]
@@ -107,7 +107,7 @@ def recite_section(ch, ear, lines, kind=None, ref=None, parts=None, gap=0.8, **k
 
 # %% ../nbs/02_recite.ipynb #e6f94b2d
 def shift(info, off):
-    "Move a section's timings `off` ms later."
+    "Move all the timings in `info` `off` milliseconds later."
     for d in info['lines']:
         if not d: continue
         d['s'] += off; d['e'] += off
@@ -116,7 +116,7 @@ def shift(info, off):
 
 # %% ../nbs/02_recite.ipynb #87630c65
 def recite(ch, ear, sections, gap=1.2, **kw):
-    "Sections (each `dict(lines=…, kind=…, ref=…)`) to one `Recitation` and per-section timings."
+    "Recite `sections`, each `dict(lines=..., kind=..., ref=...)`, as one `Recitation` with timings per section."
     recs, infos, pos = [], [], 0
     for sec in sections:
         r, info = recite_section(ch, ear, sec['lines'], sec.get('kind'), sec.get('ref'), sec.get('parts'), **kw)
@@ -126,7 +126,7 @@ def recite(ch, ear, sections, gap=1.2, **kw):
 # %% ../nbs/02_recite.ipynb #b3ae388c
 @call_parse
 def recite_cli(jobs:str, results:str, voice:str='steer', tries:int=3, max_cer:float=0.08, fx:str='warm', pace:float=1.15, pitch:float=1.0):
-    "Render a jsonl of jobs, appending timings to a jsonl of results: at `pace`, `pitch` semitones up, with the sound treatment `fx` (core.FX; 'none' for the raw render)."
+    "Render each job in the JSON lines file `jobs` and append its timings to `results`."
     from vachaka.check import Ear
     done = {json.loads(l)['id'] for l in open(results)} if Path(results).exists() else set()
     todo = [j for j in map(json.loads, open(jobs)) if j['id'] not in done]
