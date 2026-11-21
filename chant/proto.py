@@ -1,5 +1,6 @@
 "Stage 6: hear a tune before any voice is trained, through scyllasband's singing flow with our own phones and timing."
 import numpy as np
+from score import brk
 from fastcore.utils import *
 
 # Sanskrit phone -> scyllasband's 87 IPA tokens. It has no retroflex row and no aspiration, so those are approximate:
@@ -48,6 +49,6 @@ def phrases(rows, ms, limit=8500):
     if cur: padas.append(cur)
     out, ph = [], []
     for p in padas:
-        if ph and (sum(d for _, d in ph + p) > limit or ph[-1][0]['pada'] % 2): out.append(ph); ph = []
+        if ph and (sum(d for _, d in ph + p) > limit or brk(ph[-1][0])): out.append(ph); ph = []
         ph = ph + p
     return out + ([ph] if ph else [])

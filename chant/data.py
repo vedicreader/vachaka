@@ -2,7 +2,8 @@
 import json, subprocess, urllib.request
 from pathlib import Path
 from fastcore.utils import *
-from ganapati.metre import detect_meter, metrical_text
+from ganapati.metre import detect_meter, metrical_text, syllables
+from score import vedic_meter
 
 def timed(l): return 's' in l and 'e' in l and l.get('role', 'verse') in ('verse', 'audio')
 
@@ -16,12 +17,13 @@ def verses(doc):
     return out
 
 def verse_rec(doc, ls, i):
-    "One record per verse: id, audio, span in ms, lines and the metre ganapati finds."
-    t = ' '.join(l['t'] for l in ls)
+    "One record per verse: id, audio, span in ms, lines, and the metre (a Vedic one by syllable count for Veda and sūkta titles)."
+    t, ved = ' '.join(l['t'] for l in ls), doc.get('category') in ('veda', 'suktas')
     m = detect_meter(metrical_text(t))
-    return dict(id=f"{doc['name']}_{i:03d}", audio=doc['audio'], s=ls[0]['s'], e=ls[-1]['e'], text=t,
+    vm = vedic_meter(len(syllables(metrical_text(t)))) if ved else None
+    return dict(id=f"{doc['name']}_{i:03d}", audio=doc['audio'], s=ls[0]['s'], e=ls[-1]['e'], text=t, vedic=ved,
                 lines=[dict(t=l['t'], s=l['s'], e=l['e'], w=l.get('w', [])) for l in ls],
-                meter=str(m.name.value if m and m.name else ''), variant=(m.variant if m else None) or '')
+                meter=vm[0] if vm else str(m.name.value if m and m.name else ''), variant=(m.variant if m and not vm else None) or '')
 
 def scan_titles(root, glob='itihasa/valmiki/*/*.json', credit='Ghanapāṭhī V. Śrīrāma'):
     "Every timed verse of the titles under `root` whose credit names the permitted recording."

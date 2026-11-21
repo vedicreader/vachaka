@@ -40,3 +40,12 @@ def ceiling(y, sr, rows, ton=None):
     f0, sp, ap, _ = world(y, sr)
     ton = ton or tonic([f0])
     return pw.synthesize(f0, sp, ap, sr, FP), pw.synthesize(score_f0(f0, rows, ton), sp, ap, sr, FP), ton
+
+def svara_check(vs):
+    "Share of Veda verses whose udātta syllables sit above their anudātta ones; free ground truth for `syl_pitch`, it should be near 1."
+    def gap(v):
+        by = lambda k: [s for r, s in zip(v['rows'], v['st']) if r.get('sv') == k and s == s]
+        u, a = by('U'), by('A')
+        return np.mean(u) > np.mean(a) if u and a else None
+    gs = [g for v in vs if v.get('vedic') and (g := gap(v)) is not None]
+    return float(np.mean(gs)) if gs else None

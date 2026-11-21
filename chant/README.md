@@ -30,7 +30,55 @@ verse text ──ganapati──> syllables, weights, pādas
 
 - The tune model learns how these reciters sing each metre. It is small and trains on the Mac.
 - The voice model learns their voice from the same audio. The score tells it what to sing, so it does not guess.
-- One tune model serves all metres: the metre is an input.
+- One tune model serves all metres. The next section says why, and how.
+
+## Model structure per metre
+
+### The data decides the structure
+
+Recorded hours per metre in vedicreader (the Veda metre is by syllable count, ±2):
+
+| laukika | verses | h | Veda | verses | h |
+|---|---|---|---|---|---|
+| anuṣṭubh | 19,764 | 57.6 | triṣṭubh | 4,679 | 20.4 |
+| no metre found | 3,086 | 13.0 | paṅkti | 2,958 | 12.5 |
+| upajāti | 481 | 1.8 | gāyatrī | 3,417 | 8.8 |
+| śikhariṇī | 97 | 1.0 | anuṣṭubh | 2,708 | 8.4 |
+| vaṃśastha | 247 | 0.9 | jagatī | 1,113 | 5.2 |
+| indra/upendravajrā | 158 | 0.6 | uṣṇih, bṛhatī | 2,327 | 7.7 |
+| śārdūlavikrīḍita | 2 | 0.0 | | | |
+
+- One model per metre works only for anuṣṭubh. Every other laukika metre has less than 2 h.
+- So: one model for all metres, which describes a metre by its shape, not only by its name.
+- 97.6% of the Veda verses carry svara marks: 19,602 of 19,631 parse to one svara per syllable.
+
+### Four choices, each tested on made-up tunes over real verses
+
+| Problem | Structure | Test | Result |
+|---|---|---|---|
+| A reciter sings one metre to several tunes. Plain regression gives their flat average. | Tune codes: k-means on each pāda's pitch contour gives a code; the model chooses a code per pāda, then sings the syllables to it (`pada_codes`, `Tune.code_logits`). | Two tunes per pāda, rising and falling | k-means found them exactly. Pitch range per pāda: plain 0.24 st, with codes 2.92 st (truth 3.0). Error 0.88 → 0.27 st. |
+| A rare metre has a name the model barely knows. | Hide the metre name in 30% of training verses (`drop`), so the model also learns from shape. | vaṃśastha held out | 0.54 → 0.40 st, 166 → 120 ms |
+| A pāda length never heard (vaṃśastha's 12). | Place in eighths of the pāda, not a count; places counted from both ends. | Same | 0.40 → 0.31 st, 120 → 45 ms (seen metres: 0.24 st, 20 ms) |
+| Gāyatrī has 3 pādas, paṅkti 5; the written gāyatrī mantra has 23 syllables. | `pada_end` (pādas left), `pos_end`; Vedic pādas cut at the word start nearest each even split. | Ṛgveda 3.62.10 | `ta tsa vi tu rva re ṇyaṃ / bha rgo de va sya dhī ma hi / dhi yo yo naḥ pra co da yāt` |
+
+The features per syllable: weight, pāda, pādas left, place (eighths), places left, pāda end, word start, metre name, vowel, onset size, coda, mātrā place, svara.
+
+### What each metre gets
+
+- **anuṣṭubh.** Learned from 57.6 h. Use `k` 4 to 8 tune codes. Listen to the codes' centres (`centres` in `tune.pt`): each one should be a tune that you can hear in the recording.
+- **triṣṭubh family (upajāti, indravajrā, vaṃśastha) and śikhariṇī.** Same model. It learns from 2 to 3 h of shared shape, plus anuṣṭubh.
+- **śārdūlavikrīḍita, mālinī, vasantatilakā.** No data. The model sings them from shape. Judge the result by ear. To fix this, record 20 minutes in each and add them.
+- **āryā (counted in mātrās).** No audio. `mora` is a feature now, but nothing teaches it yet.
+- **gāyatrī and the other Veda metres.** Their pitch comes from the svara marks, so the svara is an input (`sv`: U, A, S, P). Use the Veda audio for three things, never as output:
+  1. `svara_check`: ground truth for stage 4. Udātta must read above anudātta. A unit test gives 1.00 for pitch with 1 st noise and 0.49 for random pitch.
+  2. Durations: guru and laghu in chant, pāda ends and breaths (`run.train(out, vedic=True)`).
+  3. The voice model in stage 7, with f0 as input.
+- **A laukika gāyatrī** (a deity gāyatrī, 3×8 without marks) shares the 8-syllable pāda with anuṣṭubh, and `pada_end` gives it the cadence on its third pāda.
+
+### When to change the structure
+
+- If the codes' centres all sound alike, the reciters use one tune: set `k=1`.
+- If one tune per pāda is too coarse (the tune changes inside a pāda), replace the codes with a flow-matching pitch head. scyllasband's pitch predictor is this kind (a rectified flow), so that it does not average. Try this only after the codes fail by ear.
 
 ## The stages
 
@@ -86,13 +134,14 @@ This gate costs one day and no training.
 
 ```sh
 python run.py prep ../../vedicreader/static/vedic_texts out 2000    # stages 2 to 4 on 2,000 verses
-python run.py train out 20                                          # anuṣṭubh only
+python run.py train out 20                                          # anuṣṭubh only, 6 tune codes
 ```
 
-- Inputs per syllable: weight, pāda, place, pāda length, pāda end, word start, metre, vowel, onset size, coda.
 - A 4-layer transformer sees the whole verse, so a syllable knows what comes before and after it.
-- Outputs: log duration in ms, pitch in semitones. The loss is masked MSE; unvoiced syllables do not count for pitch.
-- Start with anuṣṭubh only (83% of the data). Add the triṣṭubh family later. It shares one model through the metre input.
+- A code head chooses a tune for each pāda. The syllable head gives log duration in ms and pitch in semitones for that tune.
+- The loss is masked MSE plus cross-entropy on the codes. Unvoiced syllables do not count for pitch.
+- `predict` samples the codes (`temp`), so two renders of one verse can use different tunes, as a reciter does.
+- Start with anuṣṭubh only. Add the other metres and the Veda verses after.
 
 Gate: on held-out sargas, the predicted guru/laghu ratio and the pitch at pāda ends match the reciters. Then hear it in stage 6.
 
@@ -143,9 +192,11 @@ No audio could reach the container where this was written. archive.org is blocke
 | `align.place` | Fake letter spans | Phone and syllable spans correct; `dh` takes two letters |
 | `align.Aligner` | API only (dictionary, tokenizer, aligner signature) | Model download blocked. Not run on audio. |
 | `pitch.py` | A synthetic voice on notes 0, +2, +2, −1 | Read back 0.12, 1.93, 1.93, −0.98; the flat-note copy reads 0, 2, 2, −1 |
-| `tune.py` | 3,000 real verses, made-up targets with noise | Loss 1.18 to 0.059 in 6 epochs (36 s, CPU); 13 ms mean error on a śloka |
+| `tune.py` | 3,000 real verses, made-up targets with noise | First version: loss 1.18 to 0.059 in 6 epochs (36 s, CPU), 13 ms mean error on a śloka. Codes, hidden names and eighths: see the table under Model structure. |
+| `score.svaras` | Every recorded Veda verse; Ṛgveda 3.62.10 | 19,602 of 19,631 give one svara per syllable; the gāyatrī's accents match its Śākala marks |
+| `pitch.svara_check` | Made-up pitch from svaras, then random pitch | 1.00 (1 st noise), 0.98 (3 st), 0.49 (random) |
 | `proto.plan` | Against scyllasband's phone list | All phones in its vocabulary; phrases 6.6 to 7.6 s. Render not run (bundle download blocked). |
-| `run.py` | 38 verses, synthetic audio, stub aligner | prep, train and export run end to end |
+| `run.py` | 28 Rāmāyaṇa and 35 Yajurveda verses, synthetic audio, stub aligner | prep, train with 3 codes and Veda verses, and export run end to end |
 
 ## Install
 
